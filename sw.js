@@ -4,7 +4,7 @@
 // Cache-first for the app shell (everything needed to run offline) - bump
 // CACHE_NAME whenever any cached file changes so old clients pick up the
 // new version instead of being stuck on a stale cache forever.
-const CACHE_NAME = 'workout-assistant-v1';
+const CACHE_NAME = 'workout-assistant-v2';
 const ASSETS = [
   './',
   './index.html',
