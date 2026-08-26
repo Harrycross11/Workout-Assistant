@@ -118,17 +118,47 @@ does the best a browser genuinely allows:
 ## The plan builder
 
 On first launch (or via Settings → "Rebuild My Plan"), you'll go through a
-short onboarding flow: basic stats, food preferences, and any injuries/
-equipment limits. The app then swaps out specific exercises/meals based on
-what you enter (see the big comment at the top of the "Plan builder" section
-in `data.js`).
+short onboarding flow: your goal (Build Muscle / Get Shredded / Lose Weight),
+basic stats (weight, age, sex, height - height can be entered in cm or
+ft/in), food preferences, and any injuries/equipment limits. The app then
+swaps out specific exercises/meals based on what you enter, and calculates a
+daily calorie/protein target from your stats and goal (see the "Calorie/
+protein targets" and "Plan builder" comments in `data.js`).
+
+Your goal + stats drive a standard BMR/TDEE estimate (Mifflin-St Jeor
+formula, "moderately active" since the app already assumes you're doing its
+lifting plan), adjusted up for Build Muscle, down for Lose Weight/Get
+Shredded. The meal plan's portions are then scaled to hit that target -
+if a meal's actual portion size needs to be noticeably bigger or smaller
+than the base recipe text describes, you'll see a note like "Scaled up to
+~130% portions" under that meal.
 
 **This is a simple, rules-based tool, not medical, physiotherapy, or
 dietitian advice.** It only knows about a handful of self-reported flags
-(knee/back/shoulder/wrist, diet type, equipment) and swaps a pre-written
-list of exercises/meals accordingly - it can't account for your specific
-situation the way a real professional can. If you have an actual injury or
-medical condition, please check with one before starting any new plan.
+(knee/back/shoulder/wrist, diet type, equipment) and a standard calorie
+estimate formula - it can't account for your specific situation the way a
+real professional (or a lab-measured metabolic rate) can. If you have an
+actual injury or medical condition, please check with one before starting
+any new plan.
+
+## Customizing your schedule and experience level
+
+In onboarding's "Workout considerations" step you pick which days of the
+week you train (any number, not just 5) - the 5 built-in routines rotate
+across whichever days you choose, repeating if you pick fewer than 5. Your
+experience level (Beginner/Intermediate/Advanced) adds extra sets and a
+longer default rest timer as you go up - see `EXPERIENCE_ADJUST` in
+`data.js`. Both are editable any time via **Settings → Rebuild My Plan**.
+
+## Rest timer sound
+
+When a rest timer finishes, the app plays a short ascending 4-note jingle
+(plus a vibration on supporting devices) rather than a single beep, so it's
+easier to notice and doesn't sound like a generic notification. It plays
+through whatever audio output your phone currently has active - if you have
+headphones connected, it plays through them like any other sound would.
+Turn it off entirely in **Settings → Rest Timer → Play sound when rest
+ends** if you'd rather rely on vibration alone.
 
 ## Backing up your data
 

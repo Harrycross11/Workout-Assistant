@@ -21,13 +21,57 @@
      My Plan, both route back through here. -->
 <section id="view-onboarding" class="view hidden">
   <div class="wizard-card">
-    <div id="onboard-step-basics" class="wizard-step">
+    <div id="onboard-step-goal" class="wizard-step">
       <h1>Welcome to Workout Assistant</h1>
-      <p class="hint">Let's set up a plan that fits you. This takes about a minute.</p>
+      <p class="hint">First, what's your main goal? This sets your calorie and protein targets.</p>
+      <div class="goal-grid">
+        <label class="goal-tile">
+          <input type="radio" name="ob-goal" value="muscle" checked>
+          <span class="goal-title">Build Muscle</span>
+          <span class="hint-small">Eat in a calorie surplus to maximize gains</span>
+        </label>
+        <label class="goal-tile">
+          <input type="radio" name="ob-goal" value="shredded">
+          <span class="goal-title">Get Shredded</span>
+          <span class="hint-small">Lean out hard, extra protein to protect muscle</span>
+        </label>
+        <label class="goal-tile">
+          <input type="radio" name="ob-goal" value="lose">
+          <span class="goal-title">Lose Weight</span>
+          <span class="hint-small">Steady, moderate calorie deficit</span>
+        </label>
+      </div>
+      <button class="btn-primary" id="ob-next-0">Next</button>
+    </div>
+
+    <div id="onboard-step-basics" class="wizard-step hidden">
+      <h1>About you</h1>
+      <p class="hint">Used only to estimate your calorie/protein needs - stored on this device only.</p>
       <label>Weight (kg)<input type="number" id="ob-weight" inputmode="decimal" min="20" max="300" placeholder="e.g. 75"></label>
       <label>Age<input type="number" id="ob-age" inputmode="numeric" min="10" max="100" placeholder="e.g. 24"></label>
-      <label>Height (cm)<input type="number" id="ob-height" inputmode="decimal" min="100" max="250" placeholder="e.g. 178"></label>
-      <button class="btn-primary" id="ob-next-1">Next</button>
+      <label>Biological sex (for the calorie estimate)
+        <select id="ob-sex">
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </label>
+      <label>Height
+        <div class="unit-toggle">
+          <button type="button" class="unit-btn active" data-unit="cm">cm</button>
+          <button type="button" class="unit-btn" data-unit="ft">ft/in</button>
+        </div>
+        <div id="ob-height-cm-row">
+          <input type="number" id="ob-height-cm" inputmode="decimal" min="100" max="250" placeholder="e.g. 178">
+        </div>
+        <div id="ob-height-ft-row" class="hidden height-ft-inputs">
+          <input type="number" id="ob-height-ft" inputmode="numeric" min="3" max="8" placeholder="ft">
+          <input type="number" id="ob-height-in" inputmode="decimal" min="0" max="11" placeholder="in">
+        </div>
+      </label>
+      <div class="wizard-actions">
+        <button class="btn-secondary" id="ob-back-1">Back</button>
+        <button class="btn-primary" id="ob-next-1">Next</button>
+      </div>
     </div>
 
     <div id="onboard-step-diet" class="wizard-step hidden">
@@ -62,6 +106,18 @@
         <label class="checkbox-tile"><input type="checkbox" value="shoulder" class="ob-hindrance"> Shoulder problems</label>
         <label class="checkbox-tile"><input type="checkbox" value="wrist" class="ob-hindrance"> Wrist problems</label>
       </div>
+      <label>Which days do you train?
+        <div class="checkbox-grid seven-day-grid">
+          <label class="checkbox-tile"><input type="checkbox" value="0" class="ob-training-day" checked> Sun</label>
+          <label class="checkbox-tile"><input type="checkbox" value="1" class="ob-training-day"> Mon</label>
+          <label class="checkbox-tile"><input type="checkbox" value="2" class="ob-training-day" checked> Tue</label>
+          <label class="checkbox-tile"><input type="checkbox" value="3" class="ob-training-day" checked> Wed</label>
+          <label class="checkbox-tile"><input type="checkbox" value="4" class="ob-training-day" checked> Thu</label>
+          <label class="checkbox-tile"><input type="checkbox" value="5" class="ob-training-day"> Fri</label>
+          <label class="checkbox-tile"><input type="checkbox" value="6" class="ob-training-day" checked> Sat</label>
+        </div>
+      </label>
+      <p class="hint-small">Your 5 workout routines rotate across whichever days you pick (they repeat if you pick fewer than 5).</p>
       <label>Equipment available
         <select id="ob-equipment">
           <option value="fullGym">Full gym</option>
@@ -105,6 +161,7 @@
           <h2>Today's Meals</h2>
           <span id="today-nutrition-total" class="pill"></span>
         </div>
+        <p class="hint-small" id="today-nutrition-target-note"></p>
         <div id="today-meals-list"></div>
       </div>
 
@@ -142,6 +199,10 @@
         <h2>Body Weight</h2>
         <label>Weight today (kg)<input type="number" id="checkin-weight" inputmode="decimal" step="0.1"></label>
         <button class="btn-primary" id="btn-save-checkin-weight">Save Weight</button>
+        <div id="checkin-weight-sync-prompt" class="sync-prompt hidden">
+          <p class="hint-small"></p>
+          <button class="btn-secondary" id="btn-sync-checkin-weight">Update my profile weight</button>
+        </div>
         <div id="checkin-weight-history"></div>
       </div>
       <div class="card">
@@ -193,6 +254,14 @@
         <div class="habit-row">
           <label for="settings-theme-toggle">Dark theme</label>
           <input type="checkbox" id="settings-theme-toggle">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Rest Timer</h2>
+        <div class="habit-row">
+          <label for="settings-sound-toggle">Play sound when rest ends</label>
+          <input type="checkbox" id="settings-sound-toggle">
         </div>
       </div>
 

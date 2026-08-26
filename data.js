@@ -109,7 +109,10 @@ const DEFAULT_REST_SECONDS = 75;
 // buildPersonalizedMealPlans further down, which is what mealPlanForDay
 // actually reads from.
 function mealPlanForDay(dayOfWeek, profile) {
-  const plan = WORKOUT_PLAN[dayOfWeek];
+  // Reads the PERSONALIZED plan's day type, not the fixed WORKOUT_PLAN,
+  // since which days are training vs rest is now profile-driven (see
+  // buildPersonalizedWorkoutPlan's trainingDays handling).
+  const plan = buildPersonalizedWorkoutPlan(profile)[dayOfWeek];
   const meals = buildPersonalizedMealPlans(profile);
   return plan && plan.type === 'training' ? meals.training : meals.rest;
 }
@@ -254,35 +257,75 @@ const EXERCISE_ALTERNATES = {
   },
 };
 
-// Builds a personalized copy of WORKOUT_PLAN - hindrance safety takes
-// priority over equipment convenience (a knee-safe swap is picked even if
-// it still assumes a resistance band, say); equipment substitution is only
-// applied on top for exercises that DIDN'T already get swapped for a
-// hindrance, to avoid needing a fully combinatorial "knee-safe AND
-// bodyweight-only" alternative for every exercise. That's a real, narrow
-// limitation - documented rather than silently pretending full coverage.
+// The 5 distinct training routines, decoupled from any specific weekday -
+// derived from WORKOUT_PLAN's own fixed layout above (sorted Sun->Sat) so
+// the original data only has to be authored once. Which weekday each
+// routine actually lands on is now driven by the profile's chosen training
+// days (see buildPersonalizedWorkoutPlan), not these original weekday keys -
+// the exercise ids (e.g. 'tue-pushups') are just legacy identifiers at this
+// point, kept as-is so existing logged history/PRs keyed by them still work.
+const TRAINING_ROUTINES = Object.keys(WORKOUT_PLAN)
+  .map(Number)
+  .sort((a, b) => a - b)
+  .filter(day => WORKOUT_PLAN[day].type === 'training')
+  .map(day => ({ name: WORKOUT_PLAN[day].name, exercises: WORKOUT_PLAN[day].exercises }));
+
+// Matches the app's original fixed schedule (Tue/Wed/Thu/Sat/Sun) - used
+// whenever a profile doesn't have its own trainingDays yet.
+const DEFAULT_TRAINING_DAYS = [2, 3, 4, 6, 0];
+
+// A simple, transparent experience-level adjustment: more sets and a longer
+// rest window as you go up, rather than anything more elaborate (no
+// periodization, no auto-deloads) - the sets/reps/exercises themselves are
+// unchanged, this just scales volume and recovery a bit.
+const EXPERIENCE_ADJUST = {
+  beginner: { setsAdd: 0, restSeconds: DEFAULT_REST_SECONDS },
+  intermediate: { setsAdd: 1, restSeconds: 90 },
+  advanced: { setsAdd: 1, restSeconds: 120 },
+};
+function restSecondsForProfile(profile) {
+  const level = (profile && profile.experienceLevel) || 'beginner';
+  return (EXPERIENCE_ADJUST[level] || EXPERIENCE_ADJUST.beginner).restSeconds;
+}
+
+// Builds a personalized week plan: assigns TRAINING_ROUTINES to whichever
+// days the profile has chosen (cycling through the 5 routines if more or
+// fewer than 5 days are picked), then applies exercise substitutions and the
+// experience-level sets adjustment on top. Hindrance safety takes priority
+// over equipment convenience (a knee-safe swap is picked even if it still
+// assumes a resistance band, say); equipment substitution is only applied on
+// top for exercises that DIDN'T already get swapped for a hindrance, to
+// avoid needing a fully combinatorial "knee-safe AND bodyweight-only"
+// alternative for every exercise. That's a real, narrow limitation -
+// documented rather than silently pretending full coverage.
 function buildPersonalizedWorkoutPlan(profile) {
   const hindrances = (profile && profile.hindrances) || [];
   const bodyweightOnly = profile && profile.equipment === 'bodyweightOnly';
+  const setsAdd = (EXPERIENCE_ADJUST[(profile && profile.experienceLevel) || 'beginner'] || EXPERIENCE_ADJUST.beginner).setsAdd;
+  const trainingDays = (profile && profile.trainingDays && profile.trainingDays.length) ? profile.trainingDays : DEFAULT_TRAINING_DAYS;
+  const orderedDays = [...new Set(trainingDays)].sort((a, b) => a - b);
+
   const plan = {};
-  Object.keys(WORKOUT_PLAN).forEach(day => {
-    const template = WORKOUT_PLAN[day];
-    if (template.type !== 'training') { plan[day] = template; return; }
-    plan[day] = Object.assign({}, template, {
-      exercises: template.exercises.map(ex => {
+  for (let day = 0; day <= 6; day++) {
+    const idx = orderedDays.indexOf(day);
+    if (idx === -1) { plan[day] = { type: 'rest', name: 'Rest Day' }; continue; }
+    const routine = TRAINING_ROUTINES[idx % TRAINING_ROUTINES.length];
+    plan[day] = {
+      type: 'training',
+      name: routine.name,
+      time: '6:30–7:30 PM',
+      exercises: routine.exercises.map(ex => {
         const alt = EXERCISE_ALTERNATES[ex.id];
-        if (!alt) return ex;
-        const hindranceMatch = alt.avoidIf && alt.avoidIf.some(tag => hindrances.includes(tag));
-        if (hindranceMatch && alt.alt) {
-          return Object.assign({ id: ex.id, swappedFor: 'hindrance' }, alt.alt);
+        let result = ex;
+        if (alt) {
+          const hindranceMatch = alt.avoidIf && alt.avoidIf.some(tag => hindrances.includes(tag));
+          if (hindranceMatch && alt.alt) result = Object.assign({ id: ex.id, swappedFor: 'hindrance' }, alt.alt);
+          else if (bodyweightOnly && alt.bodyweightAlt) result = Object.assign({ id: ex.id, swappedFor: 'equipment' }, alt.bodyweightAlt);
         }
-        if (bodyweightOnly && alt.bodyweightAlt) {
-          return Object.assign({ id: ex.id, swappedFor: 'equipment' }, alt.bodyweightAlt);
-        }
-        return ex;
+        return Object.assign({}, result, { sets: result.sets + setsAdd });
       }),
-    });
-  });
+    };
+  }
   return plan;
 }
 
@@ -325,9 +368,56 @@ const PREWORKOUT_VARIANTS = {
   vegan: { food: 'Glass of soy milk with a handful of nuts', protein: 12, calories: 240 },
 };
 
-// Builds { training: [...meals], rest: [...meals] } from a profile's diet
-// type and preferred dinner protein - falls back to omnivore/beef if no
-// profile exists yet (e.g. the very first render before onboarding finishes).
+// ---------- Calorie/protein targets ----------
+// A standard Mifflin-St Jeor BMR estimate -> TDEE using a single fixed
+// "moderately active" multiplier (this whole app already assumes you're
+// doing its ~5x/week lifting plan, so there's no separate general-activity
+// question) -> a goal-based adjustment. This is a starting-point ESTIMATE
+// like any online TDEE calculator, not a lab measurement or medical
+// calculation - it's what personalizes the meal plan's portions below.
+const GOAL_INFO = {
+  muscle:   { label: 'Build Muscle', calorieAdjust: 300,  proteinPerKg: 2.0 },
+  shredded: { label: 'Get Shredded', calorieAdjust: -750, proteinPerKg: 2.4 },
+  lose:     { label: 'Lose Weight',  calorieAdjust: -500, proteinPerKg: 1.8 },
+};
+const ACTIVITY_MULTIPLIER = 1.55;
+
+function calculateNutritionTargets(profile) {
+  if (!profile || !profile.weightKg || !profile.age || !profile.heightCm || !profile.sex) return null;
+  const goal = GOAL_INFO[profile.goal] || GOAL_INFO.muscle;
+  const bmr = profile.sex === 'female'
+    ? 10 * profile.weightKg + 6.25 * profile.heightCm - 5 * profile.age - 161
+    : 10 * profile.weightKg + 6.25 * profile.heightCm - 5 * profile.age + 5;
+  const tdee = bmr * ACTIVITY_MULTIPLIER;
+  const calorieTarget = Math.max(1200, Math.round(tdee + goal.calorieAdjust));
+  const proteinTarget = Math.round(profile.weightKg * goal.proteinPerKg);
+  return { bmr: Math.round(bmr), tdee: Math.round(tdee), calorieTarget, proteinTarget, goalLabel: goal.label };
+}
+
+// Scales a day's meal list so its total calories line up with the profile's
+// target, and tags each meal with the scale factor used (so the UI can tell
+// you to eat bigger/smaller portions than the base recipe text describes,
+// rather than silently showing a calorie number the actual food doesn't
+// match). Clamped to 0.5x-2x so an extreme profile input can't suggest a
+// silly portion size - if you hit the clamp, the plan can't fully reach your
+// target through portion size alone and you'd need to add/remove a meal.
+function scaleMealsToTarget(meals, targets) {
+  if (!targets) return meals.map(m => Object.assign({ portionScale: 1 }, m));
+  const baseCalories = meals.reduce((sum, m) => sum + m.calories, 0);
+  if (baseCalories <= 0) return meals.map(m => Object.assign({ portionScale: 1 }, m));
+  const scale = Math.min(2, Math.max(0.5, targets.calorieTarget / baseCalories));
+  return meals.map(m => Object.assign({}, m, {
+    calories: Math.round(m.calories * scale),
+    protein: Math.round(m.protein * scale),
+    portionScale: scale,
+  }));
+}
+
+// Builds { training: [...meals], rest: [...meals], targets } from a
+// profile's diet type and preferred dinner protein - falls back to
+// omnivore/beef if no profile exists yet (e.g. the very first render before
+// onboarding finishes), and each meal's calories/protein get scaled to the
+// profile's calculated target (see scaleMealsToTarget above).
 function buildPersonalizedMealPlans(profile) {
   const dietType = (profile && profile.dietType) || 'omnivore';
   const proteinKey = (profile && profile.proteinPreference) || 'beef';
@@ -341,18 +431,22 @@ function buildPersonalizedMealPlans(profile) {
     protein: protein.protein + 12, // +12 for the 2 eggs alongside
     calories: protein.calories + 140,
   });
+  const trainingMeals = [
+    { id: 'breakfast', time: '7:00 AM', name: 'Breakfast', food: breakfast.food, protein: breakfast.protein, calories: breakfast.calories },
+    { id: 'preworkout', time: '5:30 PM', name: 'Pre-Workout Snack', food: pre.food, protein: pre.protein, calories: pre.calories },
+    buildDinner('Dinner (post-workout)', '8:00 PM'),
+    { id: 'evening', time: '9:15 PM', name: 'Evening Snack', food: evening.food, protein: evening.protein, calories: evening.calories },
+  ];
+  const restMeals = [
+    { id: 'breakfast', time: '7:00 AM', name: 'Breakfast', food: breakfast.food, protein: breakfast.protein, calories: breakfast.calories },
+    buildDinner('Dinner', '8:00 PM'),
+    { id: 'evening', time: '9:15 PM', name: 'Evening Snack', food: evening.food, protein: evening.protein, calories: evening.calories },
+  ];
+  const targets = calculateNutritionTargets(profile);
   return {
-    training: [
-      { id: 'breakfast', time: '7:00 AM', name: 'Breakfast', food: breakfast.food, protein: breakfast.protein, calories: breakfast.calories },
-      { id: 'preworkout', time: '5:30 PM', name: 'Pre-Workout Snack', food: pre.food, protein: pre.protein, calories: pre.calories },
-      buildDinner('Dinner (post-workout)', '8:00 PM'),
-      { id: 'evening', time: '9:15 PM', name: 'Evening Snack', food: evening.food, protein: evening.protein, calories: evening.calories },
-    ],
-    rest: [
-      { id: 'breakfast', time: '7:00 AM', name: 'Breakfast', food: breakfast.food, protein: breakfast.protein, calories: breakfast.calories },
-      buildDinner('Dinner', '8:00 PM'),
-      { id: 'evening', time: '9:15 PM', name: 'Evening Snack', food: evening.food, protein: evening.protein, calories: evening.calories },
-    ],
+    training: scaleMealsToTarget(trainingMeals, targets),
+    rest: scaleMealsToTarget(restMeals, targets),
+    targets,
   };
 }
 
@@ -369,10 +463,11 @@ function canQuickSwapToChicken(profile) {
 function applyDailyProteinOverride(meal, dateKey, data) {
   if (meal.id !== 'dinner' || !data.chickenSwap[dateKey]) return meal;
   const chicken = PROTEIN_SOURCES.chicken;
+  const scale = meal.portionScale || 1; // keep the swapped meal on the same personalized portion size
   return Object.assign({}, meal, {
     food: `${chicken.dinnerFood}, 2 eggs, lettuce side`,
-    protein: chicken.protein + 12,
-    calories: chicken.calories + 140,
+    protein: Math.round((chicken.protein + 12) * scale),
+    calories: Math.round((chicken.calories + 140) * scale),
     swappedToChicken: true,
   });
 }

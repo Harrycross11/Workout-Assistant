@@ -160,6 +160,8 @@ button { cursor: pointer; }
   width: 100%;
 }
 .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+.seven-day-grid { grid-template-columns: repeat(4, 1fr); }
+.seven-day-grid .checkbox-tile { justify-content: center; padding: 8px 4px; }
 .checkbox-tile {
   display: flex;
   align-items: center;
@@ -172,6 +174,47 @@ button { cursor: pointer; }
   margin: 0;
 }
 .checkbox-tile input { width: auto; margin: 0; }
+
+.goal-grid { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.goal-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  margin: 0;
+}
+.goal-tile input { position: absolute; opacity: 0; width: 0; height: 0; }
+.goal-tile:has(input:checked) { border-color: var(--accent); }
+.goal-title { font-weight: bold; font-size: 15px; }
+
+.unit-toggle { display: flex; gap: 6px; margin: 6px 0; }
+.unit-btn {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: bold;
+  font-size: 13px;
+}
+.unit-btn.active { background: var(--accent); color: #06230f; border-color: var(--accent); }
+.height-ft-inputs { display: flex; gap: 8px; margin-top: 4px; }
+.height-ft-inputs input { width: auto; flex: 1; margin: 0; }
+.portion-note { color: var(--accent-2); }
+
+.sync-prompt {
+  background: var(--surface-2);
+  border: 1px solid var(--accent-2);
+  border-radius: 10px;
+  padding: 10px;
+  margin: 10px 0;
+}
+.sync-prompt p { margin: 0 0 8px; }
 
 /* ---------- Exercises ---------- */
 .exercise-row {

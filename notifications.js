@@ -72,7 +72,7 @@ function checkScheduledNotifications(data) {
   if (!data.settings.notificationsEnabled) return;
   const now = new Date();
   const day = now.getDay();
-  const plan = WORKOUT_PLAN[day];
+  const plan = buildPersonalizedWorkoutPlan(data.profile)[day];
   const todayKeyVal = todayKey();
   data.lastNotified = data.lastNotified || {};
 

@@ -38,6 +38,7 @@ function defaultData() {
     settings: {
       theme: 'dark',
       notificationsEnabled: false,
+      restTimerSoundEnabled: true, // toggle in Settings > Rest Timer Sound - see playRestEndJingle in app.js
       lastBackup: null,
       // { 2: '18:30', 3: '18:30', ... } - editable in Settings, see
       // populateWorkoutTimeSettings. Keys are the same Date.getDay() values
@@ -77,13 +78,17 @@ function saveData(data) {
 // ---------- Profile (see the onboarding wizard) ----------
 function defaultProfile() {
   return {
-    weightKg: null, age: null, heightCm: null,
+    goal: 'muscle', // 'muscle' | 'shredded' | 'lose' - drives the calorie/protein target, see calculateNutritionTargets in data.js
+    weightKg: null, age: null, sex: 'male', // sex is only used for the BMR estimate, see data.js
+    heightCm: null,
+    heightUnit: 'cm', // 'cm' | 'ft' - just remembers which unit to show in the wizard, heightCm is always the stored value
     dietType: 'omnivore', // 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian'
     proteinPreference: 'beef', // key into PROTEIN_SOURCES, filtered by dietType in the wizard
     dislikedFoods: '', // free text, shown as a note only - not algorithmically filtered, see data.js's own disclaimer
     hindrances: [], // any of 'knee' | 'back' | 'shoulder' | 'wrist'
     equipment: 'fullGym', // 'fullGym' | 'homeDumbbells' | 'bodyweightOnly'
-    experienceLevel: 'beginner', // 'beginner' | 'intermediate' | 'advanced'
+    experienceLevel: 'beginner', // 'beginner' | 'intermediate' | 'advanced' - see EXPERIENCE_ADJUST in data.js
+    trainingDays: DEFAULT_TRAINING_DAYS.slice(), // Date.getDay() values (0=Sun..6=Sat), see buildPersonalizedWorkoutPlan in data.js
   };
 }
 function isOnboarded(data) { return !!data.profile; }
@@ -173,7 +178,7 @@ function markWeeklyCheckIn(data, weekOf, patch) {
 // doesn't add to or break the streak either way.
 function updateStreakForDate(data, dateKey) {
   const day = new Date(dateKey + 'T00:00:00').getDay();
-  const plan = WORKOUT_PLAN[day];
+  const plan = buildPersonalizedWorkoutPlan(data.profile)[day];
   if (!plan || plan.type !== 'training') return;
   const log = data.exerciseLogs[dateKey] || {};
   const allAddressed = plan.exercises.every(ex => {
