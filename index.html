@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workout Assistant</title>
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Workout Assistant">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ================= ONBOARDING WIZARD ================= -->
+<!-- Shown instead of everything else whenever data.profile is null (see
+     isOnboarded in storage.js) - a brand new install, or Settings > Rebuild
+     My Plan, both route back through here. -->
+<section id="view-onboarding" class="view hidden">
+  <div class="wizard-card">
+    <div id="onboard-step-basics" class="wizard-step">
+      <h1>Welcome to Workout Assistant</h1>
+      <p class="hint">Let's set up a plan that fits you. This takes about a minute.</p>
+      <label>Weight (kg)<input type="number" id="ob-weight" inputmode="decimal" min="20" max="300" placeholder="e.g. 75"></label>
+      <label>Age<input type="number" id="ob-age" inputmode="numeric" min="10" max="100" placeholder="e.g. 24"></label>
+      <label>Height (cm)<input type="number" id="ob-height" inputmode="decimal" min="100" max="250" placeholder="e.g. 178"></label>
+      <button class="btn-primary" id="ob-next-1">Next</button>
+    </div>
+
+    <div id="onboard-step-diet" class="wizard-step hidden">
+      <h1>Food preferences</h1>
+      <label>Diet type
+        <select id="ob-diet-type">
+          <option value="omnivore">Omnivore (eat everything)</option>
+          <option value="pescatarian">Pescatarian (fish, no other meat)</option>
+          <option value="vegetarian">Vegetarian</option>
+          <option value="vegan">Vegan</option>
+        </select>
+      </label>
+      <label>Preferred dinner protein
+        <select id="ob-protein"></select>
+      </label>
+      <label>Any foods you dislike or can't eat? (optional)
+        <textarea id="ob-disliked" rows="2" placeholder="e.g. no mushrooms, lactose intolerant"></textarea>
+      </label>
+      <p class="hint-small">This is a note shown alongside your plan, not an automatic filter - always double check a suggested meal yourself.</p>
+      <div class="wizard-actions">
+        <button class="btn-secondary" id="ob-back-2">Back</button>
+        <button class="btn-primary" id="ob-next-2">Next</button>
+      </div>
+    </div>
+
+    <div id="onboard-step-workout" class="wizard-step hidden">
+      <h1>Workout considerations</h1>
+      <p class="hint">Any of these apply to you? We'll swap out exercises that tend to aggravate them.</p>
+      <div class="checkbox-grid">
+        <label class="checkbox-tile"><input type="checkbox" value="knee" class="ob-hindrance"> Knee problems</label>
+        <label class="checkbox-tile"><input type="checkbox" value="back" class="ob-hindrance"> Back problems</label>
+        <label class="checkbox-tile"><input type="checkbox" value="shoulder" class="ob-hindrance"> Shoulder problems</label>
+        <label class="checkbox-tile"><input type="checkbox" value="wrist" class="ob-hindrance"> Wrist problems</label>
+      </div>
+      <label>Equipment available
+        <select id="ob-equipment">
+          <option value="fullGym">Full gym</option>
+          <option value="homeDumbbells">Home dumbbells/bands only</option>
+          <option value="bodyweightOnly">Bodyweight only</option>
+        </select>
+      </label>
+      <label>Experience level
+        <select id="ob-experience">
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </label>
+      <p class="hint-small disclaimer">This tool makes general, rules-based suggestions only - it isn't medical, physiotherapy, or dietitian advice. If you have a real injury or medical condition, please check with a professional before starting any new plan.</p>
+      <div class="wizard-actions">
+        <button class="btn-secondary" id="ob-back-3">Back</button>
+        <button class="btn-primary" id="ob-finish">Build My Plan</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MAIN APP ================= -->
+<div id="app-shell" class="hidden">
+  <header id="app-header">
+    <span id="app-header-title">Workout Assistant</span>
+    <button id="btn-header-home" class="icon-btn" aria-label="Home" title="Home">&#8962;</button>
+  </header>
+
+  <main id="app-main">
+
+    <!-- ---------------- TODAY ---------------- -->
+    <section id="view-today" class="view">
+      <div id="today-date" class="section-label"></div>
+
+      <div id="today-workout-card" class="card"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Today's Meals</h2>
+          <span id="today-nutrition-total" class="pill"></span>
+        </div>
+        <div id="today-meals-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Daily Habits</h2>
+        <div class="habit-row">
+          <label for="today-sleep">Hours slept last night</label>
+          <input type="number" id="today-sleep" inputmode="decimal" min="0" max="16" step="0.5">
+        </div>
+        <div class="habit-row">
+          <span>Water</span>
+          <div class="water-counter">
+            <button id="btn-water-minus" class="icon-btn">−</button>
+            <span id="water-count">0</span>
+            <button id="btn-water-plus" class="icon-btn">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="today-streak" class="card streak-card"></div>
+    </section>
+
+    <!-- ---------------- WEEKLY OVERVIEW ---------------- -->
+    <section id="view-weekly" class="view hidden">
+      <div class="section-label">This Week</div>
+      <button class="btn-primary" id="btn-goto-checkin">Weekly Check-In</button>
+      <div id="weekly-overview-list"></div>
+    </section>
+
+    <!-- ---------------- WEEKLY CHECK-IN ---------------- -->
+    <section id="view-checkin" class="view hidden">
+      <button class="btn-text" id="btn-checkin-back">&larr; Back to Week</button>
+      <div class="section-label">Weekly Check-In</div>
+      <div class="card">
+        <h2>Body Weight</h2>
+        <label>Weight today (kg)<input type="number" id="checkin-weight" inputmode="decimal" step="0.1"></label>
+        <button class="btn-primary" id="btn-save-checkin-weight">Save Weight</button>
+        <div id="checkin-weight-history"></div>
+      </div>
+      <div class="card">
+        <h2>Progress Photo</h2>
+        <p class="hint-small">Photos are stored only on this device - never uploaded anywhere.</p>
+        <input type="file" id="checkin-photo-input" accept="image/*" capture="environment" class="hidden">
+        <button class="btn-primary" id="btn-take-photo">Take / Choose Photo</button>
+        <div id="checkin-photo-compare" class="photo-compare"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- PHOTO TIMELINE ---------------- -->
+    <section id="view-photos" class="view hidden">
+      <div class="section-label">Photo Timeline</div>
+      <p class="hint-small">Photos are stored only on this device - never uploaded anywhere.</p>
+      <div id="photo-timeline-grid" class="photo-grid"></div>
+    </section>
+
+    <!-- ---------------- PROGRESS ---------------- -->
+    <section id="view-progress" class="view hidden">
+      <div class="section-label">Progress</div>
+      <button class="btn-secondary" id="btn-goto-monthly">Monthly Summary</button>
+      <div class="card">
+        <h2>Body Weight Trend</h2>
+        <canvas id="bodyweight-chart" width="320" height="160"></canvas>
+      </div>
+      <div class="card">
+        <h2>Exercise Weight History</h2>
+        <label>Exercise<select id="progress-exercise-select"></select></label>
+        <canvas id="exercise-chart" width="320" height="160"></canvas>
+        <div id="progress-pr-badge"></div>
+        <div id="progress-mini-history"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- MONTHLY SUMMARY ---------------- -->
+    <section id="view-monthly" class="view hidden">
+      <button class="btn-text" id="btn-monthly-back">&larr; Back to Progress</button>
+      <div class="section-label">Monthly Summary</div>
+      <div id="monthly-summary-content"></div>
+    </section>
+
+    <!-- ---------------- SETTINGS ---------------- -->
+    <section id="view-settings" class="view hidden">
+      <div class="section-label">Settings</div>
+
+      <div class="card">
+        <h2>Appearance</h2>
+        <div class="habit-row">
+          <label for="settings-theme-toggle">Dark theme</label>
+          <input type="checkbox" id="settings-theme-toggle">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Notifications</h2>
+        <button class="btn-primary" id="btn-enable-notifications">Enable Notifications</button>
+        <p id="notifications-status" class="hint-small"></p>
+      </div>
+
+      <div class="card">
+        <h2>Workout Times</h2>
+        <div id="settings-workout-times"></div>
+      </div>
+
+      <div class="card">
+        <h2>My Plan</h2>
+        <button class="btn-secondary" id="btn-rebuild-plan">Rebuild My Plan</button>
+      </div>
+
+      <div class="card">
+        <h2>Backup</h2>
+        <button class="btn-primary" id="btn-export-data">Download My Data</button>
+        <label class="file-label">Restore from backup<input type="file" id="import-data-input" accept="application/json" class="hidden"></label>
+        <p id="backup-status" class="hint-small"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <nav id="bottom-nav">
+    <button class="nav-btn" data-view="today" aria-label="Today">Today</button>
+    <button class="nav-btn" data-view="weekly" aria-label="Week">Week</button>
+    <button class="nav-btn" data-view="progress" aria-label="Progress">Progress</button>
+    <button class="nav-btn" data-view="photos" aria-label="Photos">Photos</button>
+    <button class="nav-btn" data-view="settings" aria-label="Settings">Settings</button>
+  </nav>
+</div>
+
+<div id="rest-timer-overlay" class="overlay hidden">
+  <div class="overlay-box">
+    <h2>Rest</h2>
+    <div id="rest-timer-display">75</div>
+    <button class="btn-secondary" id="btn-rest-skip">Skip</button>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script src="data.js"></script>
+<script src="storage.js"></script>
+<script src="chart.js"></script>
+<script src="notifications.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

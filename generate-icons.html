@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Generate Workout Assistant Icons</title></head>
+<body style="font-family:sans-serif;background:#0f172a;color:#f1f5f9;padding:24px;">
+<h1>One-time icon generator</h1>
+<p>This project ships icon.svg, but iOS specifically wants real PNG files for
+its home-screen icon (apple-touch-icon) rather than SVG. Click each button
+below once - it renders the SVG onto a canvas and downloads a PNG at the
+right size. Save each one into this <code>icons/</code> folder with the
+exact filename shown, then you can delete this file.</p>
+<div id="buttons"></div>
+<canvas id="c" style="display:none;"></canvas>
+<script>
+  const sizes = [
+    { size: 192, name: 'icon-192.png' },
+    { size: 512, name: 'icon-512.png' },
+    { size: 180, name: 'icon-180.png' }, // apple-touch-icon
+  ];
+  const img = new Image();
+  img.onload = () => {
+    const container = document.getElementById('buttons');
+    sizes.forEach(({ size, name }) => {
+      const btn = document.createElement('button');
+      btn.textContent = `Download ${name}`;
+      btn.style.cssText = 'display:block;margin:10px 0;padding:12px 20px;font-size:15px;';
+      btn.onclick = () => {
+        const canvas = document.getElementById('c');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        const a = document.createElement('a');
+        a.download = name;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      };
+      container.appendChild(btn);
+    });
+  };
+  img.src = 'icon.svg';
+</script>
+</body>
+</html>
